@@ -2,13 +2,17 @@ from lib.interface.queries.query_place_tile import QueryPlaceTile
 from lib.interface.queries.query_place_meeple import QueryPlaceMeeple
 
 from pydantic import Field, RootModel
-from typing import TypeAlias, Union
+from typing import Annotated, TypeAlias, Union
 
-QueryType: TypeAlias = Union[
-    QueryPlaceTile,
-    QueryPlaceMeeple,
+
+QueryType: TypeAlias = Annotated[
+    Union[
+        QueryPlaceTile,
+        QueryPlaceMeeple,
+    ],
+    Field(discriminator="query_type"),
 ]
 
 
-class QueryTypeAdapter(RootModel):
-    root: QueryType = Field(discriminator="query_type")
+class QueryTypeAdapter(RootModel[QueryType]):
+    pass

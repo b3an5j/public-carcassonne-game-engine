@@ -33,7 +33,7 @@ class StateMutator:
     def __init__(self, state: GameState) -> None:
         self.state = state
 
-    def commit(self, event: EventType):
+    def commit(self, event: EventType) -> None:
         self.state.event_history.append(event)
 
         match event:
@@ -87,7 +87,7 @@ class StateMutator:
         Player Tile Placed Event
         """
         # Get tile from player hand
-        tile = self.state.players[move.player_id].tiles[move.player_tile_index]
+        tile = self.state.players[move.player_id].tiles.pop(move.player_tile_index)
         tile.rotate_clockwise(move.tile.rotation)
 
         self.state.map._grid[move.tile.pos[1]][move.tile.pos[0]] = tile
@@ -111,7 +111,9 @@ class StateMutator:
                     player.points += reward
 
                     if player.points >= POINT_LIMIT:
-                        self.commit(EventGameEndedPointLimitReached(player_id=player.id))
+                        self.commit(
+                            EventGameEndedPointLimitReached(player_id=player.id)
+                        )
 
             meeples_to_return = list(
                 self.state._traverse_connected_component(
@@ -154,6 +156,9 @@ class StateMutator:
                 )
 
     def _commit_move_place_meeple(self, move: MovePlaceMeeple) -> None:
+        """
+        Player Meeple Placed Event
+        """
         player = self.state.players[move.player_id]
         assert self.state.tile_placed
 
@@ -170,7 +175,7 @@ class StateMutator:
             tile_subsciber = MonastaryNeighbourSubsciber(
                 move.tile.pos, player.id, self.state.tile_placed, move.placed_on
             )
-            tile_subsciber.register_to(self.state.tile_publisher)
+            tile_subsciber.register_to(self.state.tile_publisher, self.state.map._grid)
 
             for subscibed_complete in self.state.tile_publisher.check_notify(
                 self.state.tile_placed

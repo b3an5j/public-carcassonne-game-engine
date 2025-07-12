@@ -25,7 +25,7 @@ from lib.interface.events.moves.typing import MoveType
 from typing import Annotated, TypeAlias, Union
 
 
-DiscriminatedEvent: TypeAlias = Annotated[
+EventType: TypeAlias = Annotated[
     Union[
         EventGameStarted,
         EventPlayerBanned,
@@ -44,23 +44,4 @@ DiscriminatedEvent: TypeAlias = Annotated[
         MoveType,
     ],
     Field(discriminator="event_type"),
-]
-
-
-EventType: TypeAlias = Union[
-    EventGameStarted,
-    EventPlayerBanned,
-    EventPlayerDrewTiles,
-    EventPlayerTurnStarted,
-    EventPlayerWon,
-    EventRiverPhaseCompleted,
-    EventPlayerMeepleFreed,
-    EventPlayerWon,
-    EventGameEndedCancelled,
-    EventGameEndedPointLimitReached,
-    EventGameEndedStaleMate,
-    EventStartingTilePlaced,
-    PublicEventGameStarted,
-    PublicEventPlayerDrewTiles,
-    MoveType,
 ]

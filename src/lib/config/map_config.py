@@ -1,4 +1,3 @@
-from enum import Enum
 from typing import Callable
 
 from dotmap import DotMap
@@ -51,7 +50,7 @@ tile_counts = DotMap(
 
 NUM_PLACEABLE_TILE_TYPES = 9
 
-TILE_EDGE_IDS: dict[str, int]  = {
+TILE_EDGE_IDS: dict[str, int] = {
     "top_edge": 0,
     "right_edge": 1,
     "bottom_edge": 2,

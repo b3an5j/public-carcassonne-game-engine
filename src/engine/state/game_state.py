@@ -1,24 +1,19 @@
 from engine.config.expansion_config import EXPANSION_PACKS
-from engine.config.game_config import NUM_PLAYERS, NUM_TILES_IN_HAND
+from engine.config.game_config import NUM_PLAYERS
 from engine.game.tile_subscriber import TilePublisherBus
-from engine.interface.io.player_connection import PlayerConnection
 from engine.state.player_state import PlayerState
 from engine.config.io_config import CORE_DIRECTORY
 
 from lib.game.game_logic import GameLogic
-from lib.interact.meeple import Meeple
-from lib.interact.tile import Tile, TileModifier
+from lib.interact.tile import Tile
 from lib.interact.map import Map
 from lib.interface.events.typing import EventType
 
-from typing import Callable, Generator
-from collections import defaultdict, deque
-from random import sample
 import json
 
 
 class GameState(GameLogic):
-    def __init__(self):
+    def __init__(self) -> None:
         with open(f"{CORE_DIRECTORY}/input/catalog.json", "r") as f:
             self.catalog = json.load(f)
 
@@ -37,7 +32,7 @@ class GameState(GameLogic):
         self.event_history: list[EventType] = []
         self.turn_order: list[int] = []
 
-    def _connect_players(self):
+    def _connect_players(self) -> None:
         for player in self.players.values():
             player.connect()
 
@@ -49,7 +44,7 @@ class GameState(GameLogic):
 
     def extend_base_phase(self) -> None:
         for ex in EXPANSION_PACKS:
-            self.map.add_expansion_pack(ex)
+            self.map.add_expansion_pack(None)
 
     def start_new_round(self) -> None:
         self.round += 1
@@ -77,4 +72,3 @@ class GameState(GameLogic):
                 return player
 
         return None
-

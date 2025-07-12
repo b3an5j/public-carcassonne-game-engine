@@ -11,10 +11,11 @@ from lib.interface.events.moves.typing import MoveType
 from helper.client_state import ClientSate
 from helper.state_mutator import StateMutator
 from helper.interface import Connection
+from lib.models.tile_model import TileModel
 
 
 class Game:
-    def __init__(self):
+    def __init__(self) -> None:
         self.state = ClientSate()
         self.mutator = StateMutator(self.state)
         self.connection = Connection()
@@ -33,14 +34,14 @@ class Game:
         self.connection.send_move(move)
 
     def move_place_tile(
-        self, query: QueryPlaceTile, tile, tile_index: int
+        self, query: QueryPlaceTile, tile: TileModel, tile_index: int
     ) -> MovePlaceTile:
         return MovePlaceTile(
             player_id=self.state.me.player_id, tile=tile, player_tile_index=tile_index
         )
 
     def move_place_meeple(
-        self, query: QueryPlaceMeeple, tile, placed_on: str
+        self, query: QueryPlaceMeeple, tile: TileModel, placed_on: str
     ) -> MovePlaceMeeple:
         return MovePlaceMeeple(
             player_id=self.state.me.player_id, tile=tile, placed_on=placed_on

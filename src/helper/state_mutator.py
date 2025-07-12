@@ -1,7 +1,6 @@
-from collections import deque
 from helper.client_state import ClientSate
 
-from lib.interact.tile import Tile
+from lib.interact.meeple import Meeple
 from lib.interface.events.event_player_bannned import EventPlayerBanned
 from lib.interface.events.event_player_turn_started import EventPlayerTurnStarted
 from lib.interface.events.event_player_won import EventPlayerWon
@@ -27,15 +26,18 @@ from lib.interface.events.moves.move_place_meeple import (
     MovePlaceMeeple,
     MovePlaceMeeplePass,
 )
-from lib.interface.events.moves.move_place_tile import MovePlaceTile, PublicMovePlaceTile
+from lib.interface.events.moves.move_place_tile import (
+    MovePlaceTile,
+    PublicMovePlaceTile,
+)
 from lib.interface.events.typing import EventType
 
 
 class StateMutator:
-    def __init__(self, state: ClientSate):
+    def __init__(self, state: ClientSate) -> None:
         self.state = state
 
-    def commit(self, i: int, event: EventType):
+    def commit(self, i: int, event: EventType) -> None:
         if i != len(self.state.event_history):
             raise RuntimeError("Please send us a discord message with this error log.")
         self.state.event_history.append(event)
@@ -125,13 +127,12 @@ class StateMutator:
         self.state.map.start_river_phase()
 
     def _commit_event_player_meeple_freed(self, e: EventPlayerMeepleFreed) -> None:
-        self.state.players_meeples[e.player_id] += 1
-
         x, y = e.tile.pos
         tile = self.state.map._grid[y][x]
 
         assert tile is not None
         tile.internal_claims[e.placed_on] = None
+        self.state.players_meeples[e.player_id] += 1
 
         if e.player_id == self.state.me.player_id:
             self.state.me.num_meeples += 1
@@ -141,7 +142,7 @@ class StateMutator:
 
     def _commit_move_place_tile(self, e: MovePlaceTile) -> None:
         if e.player_id != self.state.me.player_id:
-            pass
+            raise RuntimeError("Please send us a discord message with this error log.")
 
         x, y = e.tile.pos
         tile = self.state.my_tiles.pop(e.player_tile_index)
@@ -149,6 +150,7 @@ class StateMutator:
 
         self.state.map._grid[y][x] = tile
         self.state.map.placed_tiles.append(tile)
+        self.state.players[e.player_id].num_tiles -= 1
 
     def _commit_public_move_place_tile(self, e: PublicMovePlaceTile) -> None:
         self.state.players[e.player_id].num_tiles -= 1
@@ -167,7 +169,8 @@ class StateMutator:
         tile = self.state.map._grid[y][x]
 
         assert tile is not None
-        tile.internal_claims[e.placed_on] = None
+        tile.internal_claims[e.placed_on] = Meeple(e.player_id)
+        self.state.players_meeples[e.player_id] -= 1
 
         if e.player_id == self.state.me.player_id:
             self.state.me.num_meeples -= 1

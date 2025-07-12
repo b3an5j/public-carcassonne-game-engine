@@ -1,4 +1,4 @@
-from collections import defaultdict, deque
+from collections import defaultdict
 from lib.interact.tile import (
     Tile,
     create_base_tiles,
@@ -13,12 +13,11 @@ class Map:
     def __init__(self) -> None:
         self.placed_tiles: list[Tile] = []
         self.available_tiles: set[Tile] = set()
-        self.available_tiles_by_type = defaultdict(list)
+        self.available_tiles_by_type: dict[str, list[Tile]] = defaultdict(list)
 
         self._grid: list[list[Tile | None]] = [
             [None for _ in range(MAX_MAP_LENGTH)] for _ in range(MAX_MAP_LENGTH)
         ]
-        self._grid_subscribers = []
 
     def start_base_phase(self) -> None:
         assert not self.available_tiles
@@ -51,8 +50,7 @@ class Map:
         self.placed_tiles.append(river_end_tile)
         river_end_tile.placed_pos = MAP_CENTER
 
-
-    def add_expansion_pack(self, expansion_pack) -> None:
+    def add_expansion_pack(self, expansion_pack: None) -> None:
         pass
 
     def get_tile_by_type(self, type: str, pop: bool) -> "Tile":

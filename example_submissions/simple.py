@@ -2,7 +2,6 @@
 # This was produced with the assistance of GPT 4o
 
 from helper.game import Game
-from lib.interact.tile import Tile
 from lib.interface.events.moves.move_place_meeple import (
     MovePlaceMeeple,
     MovePlaceMeeplePass,
@@ -16,11 +15,11 @@ from lib.models.tile_model import TileModel
 
 
 class BotState:
-    def __init__(self):
+    def __init__(self) -> None:
         self.last_tile: TileModel | None = None
 
 
-def main():
+def main() -> None:
     game = Game()
     bot_state = BotState()
 
@@ -88,7 +87,7 @@ def handle_place_meeple(
     """Try to place a meeple on the tile just placed, or pass."""
     assert bot_state.last_tile is not None
     structures = game.state.get_placeable_structures(bot_state.last_tile)
-    
+
     x, y = bot_state.last_tile.pos
     tile = game.state.map._grid[y][x]
 

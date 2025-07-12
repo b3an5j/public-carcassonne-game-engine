@@ -8,7 +8,7 @@ READ_CHUNK_SIZE = 1024
 
 
 class Connection:
-    def __init__(self):
+    def __init__(self) -> None:
         self._to_engine_pipe = open("./io/to_engine.pipe", "w")
         self._from_engine_pipe = open("./io/from_engine.pipe", "r")
 
@@ -50,5 +50,5 @@ class Connection:
     def get_next_query(self) -> QueryType:
         return QueryTypeAdapter.model_validate_json(self._receive()).root
 
-    def send_move(self, move: MoveType):
+    def send_move(self, move: MoveType) -> None:
         self._send(move.model_dump_json())

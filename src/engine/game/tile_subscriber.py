@@ -1,8 +1,9 @@
 from lib.interact.tile import Tile
 from lib.config.scoring import MONASTARY_POINTS
+from lib.config.map_config import MAX_MAP_LENGTH
 
 from abc import ABC, abstractmethod
-from typing import Generator, final
+from typing import Iterator, final
 
 
 class TileSubsciber(ABC):
@@ -33,7 +34,7 @@ class MonastaryNeighbourSubsciber(TileSubsciber):
         self, center: tuple[int, int], player_id: int, tile: "Tile", claim: str
     ) -> None:
         self.center = center
-        self.filled = set()
+        self.filled: set[Tile] = set()
         self.registered = False
         self.player_id = player_id
         self.tile = tile
@@ -42,7 +43,7 @@ class MonastaryNeighbourSubsciber(TileSubsciber):
 
     @final
     def on_tile_changed(self, tile: "Tile") -> bool:
-        if tile.placed_pos not in self.filled:
+        if tile not in self.filled:
             self.filled.add(tile)
 
         if len(self.filled) >= 8:
@@ -54,8 +55,12 @@ class MonastaryNeighbourSubsciber(TileSubsciber):
         self, publisher: "TilePublisherBus", grid: list[list["Tile | None"]] = list()
     ) -> None:
         for x, y in self._watching():
-            if grid[y][x] is not None:
-                self.filled.add((x, y))
+            assert len(grid) == MAX_MAP_LENGTH
+
+            tile = grid[y][x]
+
+            if tile is not None:
+                self.filled.add(tile)
         return super().register_to(publisher)
 
     @final
@@ -79,7 +84,7 @@ class MonastaryNeighbourSubsciber(TileSubsciber):
 class TilePublisherBus:
     _singleton: "TilePublisherBus | None" = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.watchers: dict[tuple[int, int], list[TileSubsciber]] = {}
 
     def __new__(cls) -> "TilePublisherBus":
@@ -88,10 +93,10 @@ class TilePublisherBus:
 
         return cls._singleton
 
-    def register(self, position: tuple[int, int], watcher: TileSubsciber):
+    def register(self, position: tuple[int, int], watcher: TileSubsciber) -> None:
         self.watchers.setdefault(position, []).append(watcher)
 
-    def check_notify(self, tile: "Tile") -> Generator[TileSubsciber]:
+    def check_notify(self, tile: "Tile") -> Iterator[TileSubsciber]:
         assert tile.placed_pos
         for subsciber in self.watchers.get(tile.placed_pos, []):
             if subsciber.on_tile_changed(tile):

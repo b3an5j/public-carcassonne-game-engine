@@ -1,3 +1,5 @@
+# mypy: disable-error-code=return-value
+
 from pydantic import TypeAdapter, ValidationError
 from engine.config.io_config import (
     CORE_DIRECTORY,
@@ -21,6 +23,7 @@ from engine.interface.io.exceptions import (
 from engine.interface.io.input_validator import MoveValidator
 from engine.interface.io.censor_event import CensorEvent
 
+from lib.interface.events.typing import EventType
 from lib.interface.queries.query_place_meeple import QueryPlaceMeeple
 from lib.interface.queries.query_place_tile import QueryPlaceTile
 from lib.interface.queries.typing import QueryType
@@ -40,7 +43,9 @@ from time import time
 from itertools import islice
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
+    NoReturn,
     Optional,
     ParamSpec,
     Type,
@@ -50,7 +55,7 @@ from typing import (
 )
 
 # performance boost on deserializing unions.
-cached_type_adapters: dict[frozenset[str], TypeAdapter] = {}
+cached_type_adapters: dict[frozenset[str], TypeAdapter[Any]] = {}
 
 if TYPE_CHECKING:
     from engine.state.game_state import GameState
@@ -106,17 +111,19 @@ def handle_invalid(fn: Callable[P, T1]) -> Callable[P, T1]:
     return dfn
 
 
-def time_limited(error_message: str = "You took too long to respond.", initial=False):
+def time_limited(
+    error_message: str = "You took too long to respond.", initial: bool = False
+) -> Callable[[Callable[P, T1]], Callable[P, T1]]:
     """Decorator to trigger ban if the player takes too long to respond."""
 
-    def dfn1(fn: Callable[P, T1]):
+    def dfn1(fn: Callable[P, T1]) -> Callable[P, T1]:
         def dfn2(*args: P.args, **kwargs: P.kwargs) -> T1:
             self: "PlayerConnection" = args[0]  # type: ignore
             query: Optional[QueryType] = None
             if len(args) >= 2 and isinstance(args[1], BaseQuery):
                 query = args[1]  # type: ignore
 
-            def on_timeout_alarm(*_):
+            def on_timeout_alarm(*_) -> NoReturn:  # type: ignore
                 raise TimeoutException(self.player_id, error_message, query)
 
             signal(SIGALRM, on_timeout_alarm)
@@ -223,7 +230,7 @@ class PlayerConnection:
             validator.validate(move, query, self.player_id)
         except ValueError as e:
             raise InvalidMoveError(str(e), move)
-        return move
+        return move  # ignore: type
 
     @handle_invalid
     @handle_sigpipe
@@ -241,7 +248,7 @@ class PlayerConnection:
         if types in cached_type_adapters:
             adapter = cached_type_adapters[types]
         else:
-            cached_type_adapters[types] = TypeAdapter(
+            cached_type_adapters[types] = TypeAdapter[Any](
                 Union[response_type_1, response_type_2]
             )
             adapter = cached_type_adapters[types]
@@ -251,9 +258,11 @@ class PlayerConnection:
             validator.validate(move, query, self.player_id)
         except ValueError as e:
             raise InvalidMoveError(str(e), move)
-        return move
+        return move  # type: ignore[no-any-return]
 
-    def _get_record_update_dict(self, state: "GameState", censor: CensorEvent):
+    def _get_record_update_dict(
+        self, state: "GameState", censor: CensorEvent
+    ) -> dict[int, EventType]:
         if self._record_update_watermark >= len(state.event_history):
             raise RuntimeError(
                 "Record update watermark out of sync with state, did you try to send two queries without committing the first?"

@@ -1,4 +1,3 @@
-from collections import defaultdict
 from lib.config.map_config import MAX_MAP_LENGTH, MONASTARY_IDENTIFIER
 from lib.game.game_logic import GameLogic
 from lib.interact.meeple import Meeple
@@ -11,7 +10,7 @@ from lib.interact.structure import StructureType
 
 
 class ClientSate(GameLogic):
-    def __init__(self):
+    def __init__(self) -> None:
         self.round = -1
         self.players: dict[int, PublicPlayerModel]
         self.players_meeples: dict[int, int]

@@ -1,13 +1,15 @@
-from engine.state.player_state import PlayerState
+from lib.config.map_config import MONASTARY_IDENTIFIER
 from lib.interact.map import Map
 from lib.interact.meeple import Meeple
 from lib.interact.tile import Tile, TileModifier
 
 from collections import defaultdict, deque
-from typing import Callable, Generator, Protocol
+from typing import Callable, Iterator, Protocol
+
 
 class SharedGameState(Protocol):
     map: Map
+
 
 class GameLogic(SharedGameState):
     def _get_claims_objs(self, tile: "Tile", edge: str) -> dict[int, list[Meeple]]:
@@ -22,6 +24,13 @@ class GameLogic(SharedGameState):
 
     def _get_claims(self, tile: "Tile", edge: str) -> list[int]:
         players: set[int] = set()
+
+        if edge == MONASTARY_IDENTIFIER:
+            m = tile.internal_claims[edge]
+            if not m:
+                return []
+
+            return [m.player_id]
 
         for connected_tile, e in self._traverse_connected_component(tile, edge):
             meeple = connected_tile.internal_claims[e]
@@ -69,7 +78,7 @@ class GameLogic(SharedGameState):
         edge: str,
         yield_cond: Callable[[Tile, str], bool] = lambda _1, _2: True,
         modify: Callable[[Tile, str], None] = lambda _1, _2: None,
-    ) -> Generator[tuple["Tile", str]]:
+    ) -> Iterator[tuple["Tile", str]]:
         visited = set()
         structure_type = start_tile.internal_edges[edge]
         structure_bridge = TileModifier.get_bridge_modifier(structure_type)
@@ -118,4 +127,3 @@ class GameLogic(SharedGameState):
 
                     if (neighbouring_tile, neighbouring_tile_edge) not in visited:
                         queue.append((neighbouring_tile, neighbouring_tile_edge))
-

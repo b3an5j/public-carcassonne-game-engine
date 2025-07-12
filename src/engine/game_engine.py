@@ -22,7 +22,6 @@ from engine.state.state_mutator import StateMutator
 
 from lib.config.expansion import EXPANSION
 from lib.config.map_config import MAP_CENTER, TILE_EDGE_IDS, TILE_EXTERNAL_POS
-from lib.config.scoring import POINT_LIMIT
 from lib.interact.structure import StructureType
 from lib.interact.tile import Tile
 from lib.interface.events.event_game_ended import (
@@ -39,7 +38,7 @@ import shutil
 
 
 class GameEngine:
-    def __init__(self, print_recording_interactive: bool = False):
+    def __init__(self, print_recording_interactive: bool = False) -> None:
         print("Intialising game engine!")
 
         self.state = GameState()
@@ -47,7 +46,7 @@ class GameEngine:
         self.mutator = StateMutator(self.state)
         self.censor = CensorEvent(self.state)
 
-    def start(self):
+    def start(self) -> None:
         try:
             self.state._connect_players()
             self.run_game()
@@ -57,7 +56,7 @@ class GameEngine:
         finally:
             self.finish()
 
-    def run_game(self):
+    def run_game(self) -> None:
         assert NUM_PLAYERS == len(self.state.players)
         turn_order = sample(list(self.state.players.keys()), k=NUM_PLAYERS)
         self.state.turn_order = turn_order
@@ -93,7 +92,9 @@ class GameEngine:
                     for e, s in tile.internal_edges.items():
                         assert tile.placed_pos is not None
 
-                        if s == StructureType.RIVER and not Tile.get_external_tile(e, tile.placed_pos, self.state.map._grid):
+                        if s == StructureType.RIVER and not Tile.get_external_tile(
+                            e, tile.placed_pos, self.state.map._grid
+                        ):
                             edge = e
                             break
 
@@ -109,7 +110,9 @@ class GameEngine:
 
                     self.state.map._grid[y][x] = river_end
 
-                    self.mutator.commit(EventRiverPhaseCompleted(end_tile=river_end._to_model()))
+                    self.mutator.commit(
+                        EventRiverPhaseCompleted(end_tile=river_end._to_model())
+                    )
 
                     if EXPANSION:
                         self.state.extend_base_phase()
@@ -123,9 +126,9 @@ class GameEngine:
                         self.state.map.available_tiles.difference_update(tiles_drawn)
 
                         for tile in tiles_drawn:
-                            self.state.map.available_tiles_by_type[tile.tile_type].remove(
-                                tile
-                            )
+                            self.state.map.available_tiles_by_type[
+                                tile.tile_type
+                            ].remove(tile)
 
                         player.tiles.extend(tiles_drawn)
 
@@ -142,7 +145,6 @@ class GameEngine:
             self.state.start_new_round()
 
             for player_id in turn_order:
-
                 if self.state.game_over:
                     break
 
@@ -173,7 +175,6 @@ class GameEngine:
 
                 self.start_player_turn(player)
 
-
             # If mutator ended game
             if self.state.game_over:
                 self.calc_final_points()
@@ -202,12 +203,12 @@ class GameEngine:
         )
         self.mutator.commit(response)
 
-        response = player.connection.query_place_meeple(
+        response2 = player.connection.query_place_meeple(
             self.state, self.validator, self.censor
         )
-        self.mutator.commit(response)
+        self.mutator.commit(response2)
 
-    def calc_final_points(self):
+    def calc_final_points(self) -> None:
         tiles_unclaimed: list[tuple["Tile", str]] = [
             (meeple.placed, meeple.placed_edge)
             for player in self.state.players.values()
@@ -269,7 +270,7 @@ class GameEngine:
         ) as f:
             f.write(visualiser_data)
 
-        def copy_stdout_stderr_player(player: int):
+        def copy_stdout_stderr_player(player: int) -> None:
             stderr_path = f"{CORE_DIRECTORY}/submission{player}/io/submission.err"
             stderr_path_new = f"{CORE_DIRECTORY}/output/submission_{player}.err"
             stdout_path = f"{CORE_DIRECTORY}/submission{player}/io/submission.log"

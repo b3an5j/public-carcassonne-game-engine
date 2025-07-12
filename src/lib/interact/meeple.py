@@ -19,7 +19,7 @@ class Meeple:
         self.placed: Tile | None = None
         self.placed_edge: str = ""
 
-    def _place_meeple(self, tile: "Tile", edge: str):
+    def _place_meeple(self, tile: "Tile", edge: str) -> None:
         self.placed = tile
         self.placed_edge = edge
         tile.internal_claims[edge] = self

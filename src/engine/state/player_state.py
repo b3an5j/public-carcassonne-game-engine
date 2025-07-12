@@ -15,7 +15,7 @@ class PlayerState:
         self.meeples: list["Meeple"] = [Meeple(player_id) for _ in range(NUM_MEEPLES)]
         self.connection: PlayerConnection
 
-    def connect(self):
+    def connect(self) -> None:
         self.connection = PlayerConnection(self.id)
 
     def _get_available_meeple(self) -> Meeple | None:

@@ -13,7 +13,7 @@ class StructureType(Enum):
     MONASTARY = auto()
 
     @staticmethod
-    def get_points(structure_type: "StructureType"):
+    def get_points(structure_type: "StructureType") -> int:
         return {
             StructureType.ROAD: ROAD_POINTS,
             StructureType.ROAD_START: ROAD_POINTS,

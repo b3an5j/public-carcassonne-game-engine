@@ -51,7 +51,7 @@ class TileModifier(Enum):
                 TileModifier.EMBLEM: lambda x: x + 1,
             }.get(tm, lambda x: x + NO_POINTS)
 
-        points = StructureType.get_points(structure)
+        points: int = StructureType.get_points(structure)
 
         for mod in _get_point_modifiers(structure):
             points = _point_modifier_config(mod)(points)
@@ -100,7 +100,7 @@ class Tile:
     @final
     @staticmethod
     def get_external_tile(
-        edge, pos: tuple[int, int], grid: list[list["Tile | None"]]
+        edge: str, pos: tuple[int, int], grid: list[list["Tile | None"]]
     ) -> "Tile | None":
         match edge:
             case "left_edge":
@@ -121,7 +121,9 @@ class Tile:
         tiles: dict[str, "Tile | None"] = {}
         for edge in self.internal_edges:
             if self.placed_pos:
-                tiles[edge] = (self.__class__.get_external_tile(edge, self.placed_pos, grid))
+                tiles[edge] = self.__class__.get_external_tile(
+                    edge, self.placed_pos, grid
+                )
 
             else:
                 tiles[edge] = None
@@ -207,7 +209,7 @@ class Tile:
         self.rotation += number
         self.rotation %= 4
 
-    def _claim_edge(self, meeple: Meeple, edge: str):
+    def _claim_edge(self, meeple: Meeple, edge: str) -> None:
         self.internal_claims[edge] = meeple
 
     @final
@@ -217,7 +219,7 @@ class Tile:
         return cloned_tiles
 
     @final
-    def _to_model(self):
+    def _to_model(self) -> TileModel:
         return TileModel(
             tile_type=self.tile_type,
             pos=self.placed_pos or (0, 0),
@@ -614,7 +616,7 @@ def create_base_tiles() -> list["Tile"]:
     return tiles
 
 
-def create_expansion_tiles():
+def create_expansion_tiles() -> None:
     """
     ExpansionTiles
     """
