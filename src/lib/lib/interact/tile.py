@@ -48,7 +48,7 @@ class TileModifier(Enum):
         def _point_modifier_config(tm: "TileModifier") -> Callable[[int], int]:
             return {
                 TileModifier.MONASTARY: lambda x: x + 9,
-                TileModifier.EMBLEM: lambda x: x + 1,
+                TileModifier.EMBLEM: lambda x: x + 2,
             }.get(tm, lambda x: x + NO_POINTS)
 
         points: int = StructureType.get_points(structure)

@@ -56,6 +56,9 @@ class MoveValidator:
         # R3
         print("Validator recieved tile type", e.tile.tile_type)
 
+        # for row in self.state.map._grid[80:91]:
+        #     print([col for col in row[80:91]])
+
         neighbouring_tiles = {
             edge: Tile.get_external_tile(edge, (x, y), self.state.map._grid)
             for edge in Tile.get_edges()
@@ -80,7 +83,7 @@ class MoveValidator:
 
         tile = self.state.players[player_id].tiles[e.player_tile_index]
 
-        print(self.state.players[player_id].tiles)
+        # print(self.state.players[player_id].tiles)
 
         if tile.tile_type != e.tile.tile_type:
             raise ValueError(
@@ -88,7 +91,6 @@ class MoveValidator:
             )
 
         tile = deepcopy(tile)
-        tile.rotate_clockwise(e.tile.rotation)
 
         # Validate rotation
         if e.tile.rotation not in VALID_ROTATIONS:
@@ -96,11 +98,10 @@ class MoveValidator:
                 f"You tried placing with an invalid rotation - Recieved Tile Rotation {e.tile.rotation}"
             )
 
+        while tile.rotation != e.tile.rotation:
+            tile.rotate_clockwise(1)
         # Validate Tile Pos
         if not any(neighbouring_tiles.values()):
-            # for row in self.state.map._grid[80:91]:
-            #     print([col for col in row[80:91]])
-
             raise ValueError(
                 f"You placed a tile in an empty space - no neighbours at {x, y}"
             )
@@ -113,17 +114,20 @@ class MoveValidator:
             #     print([col for col in row[80:91]])
 
             edge_structure = tile.internal_edges[edge]
-            # Flag if there is an edge with a river on this tile.
 
+            # Flag if there is an edge with a river on this tile.
             river_flag = edge_structure == StructureType.RIVER
+
             if neighbour_tile:
                 # Check if edges are aligned with correct structures
                 neighboring_edge = neighbour_tile.internal_edges[
                     Tile.get_opposite(edge)
                 ]
                 if neighboring_edge != edge_structure:
+                    print(tile.tile_type, tile.rotation)
+                    print(neighbour_tile.tile_type, neighbour_tile.rotation)
                     raise ValueError(
-                        f"You placed a tile in an mismatched position - {edge} mismatch, your edge is {neighbour_tile.internal_edges[Tile.get_opposite(edge)]} != {tile.internal_edges[edge]}"
+                        f"You placed a tile in an mismatched position - {edge} mismatch, your edge is {tile.internal_edges[edge]} on rotation {tile.rotation} at coordinates {e.tile.pos} != {neighbour_tile.internal_edges[Tile.get_opposite(edge)]} on rotation {neighbour_tile.rotation} at position {neighbour_tile.placed_pos}"
                     )
 
                 # Check if we successfully connected a river structure
