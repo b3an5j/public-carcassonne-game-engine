@@ -50,13 +50,20 @@ class ClientSate(GameLogic):
         # Does not return monastary
         return {
             edge: structure
-            for t in self.map.available_tiles
+            for t in self.map.available_tiles.union(set(self.map.placed_tiles))
             for edge, structure in t.internal_edges.items()
             if tile.tile_type == t.tile_type
         }
 
     def get_placeable_structures(self, my_tile: TileModel) -> dict[str, StructureType]:
-        placable_structures = self.get_tile_structures(my_tile)
+        placable_structures: dict[str, StructureType] = {
+            e: s
+            for e, s in self.get_tile_structures(my_tile).items()
+            if StructureType.can_claim(s)
+        }
+
+        print(placable_structures, flush=True)
+
         x, y = my_tile.pos
         tile = self.map._grid[y][x]
 

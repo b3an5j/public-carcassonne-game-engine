@@ -129,6 +129,9 @@ def handle_place_tile(
                         query, tile_in_hand._to_model(), tile_hand_index
                     )
 
+    # Couldn't find a tile to place
+    assert False
+
 
 def handle_place_meeple(
     game: Game, bot_state: BotState, query: QueryPlaceMeeple
@@ -159,22 +162,42 @@ def handle_place_meeple(
                 and any(mod.name == "MONESTERY" for mod in recent_tile.modifiers)
                 and recent_tile.internal_claims.get(MONASTARY_IDENTIFIER) is None
             ):
+                assert bot_state.last_tile
+                print(
+                    "[ ERROR ] M ",
+                    recent_tile,
+                    edge,
+                    bot_state.last_tile.internal_edges[edge],
+                    flush=True,
+                )
                 return game.move_place_meeple(
                     query, recent_tile._to_model(), MONASTARY_IDENTIFIER
                 )
         else:
             # Check if edge has a claimable structure
-            structure = recent_tile.internal_edges.get(edge)
-            if (
-                structure
-                and structure != StructureType.GRASS
-                and recent_tile.internal_claims.get(edge) is None
-            ):
+            assert bot_state.last_tile
+            structures = list(
+                game.state.get_placeable_structures(
+                    bot_state.last_tile._to_model()
+                ).items()
+            )
+
+            e, structure = structures[0] if structures else None, None
+
+            if structure and e and recent_tile.internal_claims.get(edge) is None:
                 # Check if the structure is actually unclaimed (not connected to claimed structures)
-                if not game.state._get_claims(recent_tile, edge):
+                if not game.state._get_claims(recent_tile, e):
+                    print(
+                        "[ ERROR ] ",
+                        recent_tile,
+                        edge,
+                        bot_state.last_tile.internal_edges[edge],
+                        flush=True,
+                    )
                     return game.move_place_meeple(query, recent_tile._to_model(), edge)
 
     # No valid placement found, pass
+    print("[ ERROR ] ", flush=True)
     return game.move_place_meeple_pass(query)
 
 

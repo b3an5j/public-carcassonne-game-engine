@@ -1,5 +1,7 @@
 from copy import deepcopy
 from typing import TYPE_CHECKING
+
+from lib.game.game_logic import TileModifier
 from engine.config.game_config import MAX_NUM_TILES_IN_HAND
 from lib.config.map_config import MONASTARY_IDENTIFIER, NUM_PLACEABLE_TILE_TYPES
 from lib.interface.events.moves.move_place_meeple import (
@@ -21,6 +23,12 @@ VALID_PLACEABLE_TILE_TYPES.extend(
 
 VALID_ROTATIONS = [0, 1, 2, 3]
 VALID_MEEPLE_PLACEMENTS = Tile.get_starting_tile().internal_claims.keys()
+VALID_STRUCTURE_CLAIMS = [
+    StructureType.MONASTARY,
+    StructureType.CITY,
+    StructureType.ROAD,
+    StructureType.ROAD_START,
+]
 
 if TYPE_CHECKING:
     from engine.state.game_state import GameState
@@ -56,9 +64,6 @@ class MoveValidator:
         # R3
         print("Validator recieved tile type", e.tile.tile_type)
 
-        # for row in self.state.map._grid[80:91]:
-        #     print([col for col in row[80:91]])
-
         neighbouring_tiles = {
             edge: Tile.get_external_tile(edge, (x, y), self.state.map._grid)
             for edge in Tile.get_edges()
@@ -82,8 +87,6 @@ class MoveValidator:
             )
 
         tile = self.state.players[player_id].tiles[e.player_tile_index]
-
-        # print(self.state.players[player_id].tiles)
 
         if tile.tile_type != e.tile.tile_type:
             raise ValueError(
@@ -109,10 +112,8 @@ class MoveValidator:
         # Validating each edge is alighed with a corrrect structure
         river_flag = False
         river_connections = 0
-        for edge, neighbour_tile in neighbouring_tiles.items():
-            # for row in self.state.map._grid[80:91]:
-            #     print([col for col in row[80:91]])
 
+        for edge, neighbour_tile in neighbouring_tiles.items():
             edge_structure = tile.internal_edges[edge]
 
             # Flag if there is an edge with a river on this tile.
@@ -151,11 +152,10 @@ class MoveValidator:
                 forecast_x = x + extension[0]
                 forecast_y = y + extension[1]
 
-                for i in range(4):
-                    coords = list(forcast_coordinates_one.values())[i]
+                for coords in forcast_coordinates_one.values():
                     checking_x = forecast_x + coords[0]
                     checking_y = forecast_y + coords[1]
-                    if checking_x != x and checking_y != y:
+                    if not (checking_x == x and checking_y == y):
                         if self.state.map._grid[checking_y][checking_x] is not None:
                             raise ValueError(
                                 "You placed a tile that will lead to a U-Turn in the river."
@@ -173,11 +173,14 @@ class MoveValidator:
                 # Look at the tile two tiles away from the direction the river is facing on our current tile
                 forecast_x = x + extension[0]
                 forecast_y = y + extension[1]
-                if self.state.map._grid[forecast_y][forecast_x] is not None:
-                    raise ValueError(
-                        "You placed a tile that will lead to a U-Turn in the river."
-                    )
+                for coords in forcast_coordinates_one.values():
+                    checking_x = forecast_x + coords[0]
+                    checking_y = forecast_y + coords[1]
 
+                    if self.state.map._grid[checking_y][checking_x] is not None:
+                        raise ValueError(
+                            "You placed a tile that will lead to a U-Turn in the river."
+                        )
         # Check if there is at least one river edge that is connected
         if river_flag and river_connections == 0:
             raise ValueError(
@@ -210,6 +213,21 @@ class MoveValidator:
                 raise ValueError(
                     "You tried placing a meeple on an unclaimable Structure - \
                     adjacent structure claimed by an opponent"
+                )
+
+            if (
+                self.state.tile_placed.internal_edges[e.placed_on]
+                not in VALID_STRUCTURE_CLAIMS
+            ):
+                raise ValueError(
+                    f"You placed a meeple on a invalid edge - Edge Strcuture is {self.state.tile_placed.internal_edges[e.placed_on]}"
+                )
+
+        if e.placed_on == MONASTARY_IDENTIFIER:
+            if TileModifier.MONASTARY not in self.state.tile_placed.modifiers:
+                raise ValueError(
+                    "You tried placing a meeple on a Monastary - \
+                    There is no Monastary on the tile "
                 )
 
     def _validate_place_meeple_pass(
