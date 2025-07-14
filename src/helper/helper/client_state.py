@@ -8,6 +8,8 @@ from lib.models.player_model import PlayerModel, PublicPlayerModel
 from lib.models.tile_model import TileModel
 from lib.interact.structure import StructureType
 
+from copy import deepcopy
+
 
 class ClientSate(GameLogic):
     def __init__(self) -> None:
@@ -48,11 +50,19 @@ class ClientSate(GameLogic):
 
     def get_tile_structures(self, tile: TileModel) -> dict[str, StructureType]:
         # Does not return monastary
+        found_tile: Tile | None = None
+        for t in self.map.available_tiles.union(set(self.map.placed_tiles)):
+            if tile.tile_type == t.tile_type:
+                found_tile = t
+
+        assert found_tile
+        found_tile = deepcopy(found_tile)
+
+        while found_tile.rotation != tile.rotation:
+            found_tile.rotate_clockwise(1)
+
         return {
-            edge: structure
-            for t in self.map.available_tiles.union(set(self.map.placed_tiles))
-            for edge, structure in t.internal_edges.items()
-            if tile.tile_type == t.tile_type
+            edge: structure for edge, structure in found_tile.internal_edges.items()
         }
 
     def get_placeable_structures(self, my_tile: TileModel) -> dict[str, StructureType]:
