@@ -5,6 +5,7 @@ from lib.interact.structure import StructureType
 from lib.interface.events.typing import *
 from lib.interface.events.moves.typing import *
 from itertools import product
+from copy import deepcopy
 
 
 # CARDS
@@ -198,6 +199,9 @@ class Board:
             [MAP_CENTER[0]-1, MAP_CENTER[1]-1],     # towards top-left corner (2nd quadrant)
             [MAP_CENTER[0]+1, MAP_CENTER[1]+1]      # towards bottom-right corner (4th quadrant)
         ]  # no need to brute force
+    
+    def copy(self):
+        return deepcopy(self)
     
     def place_tile(self, pos: tuple[int, int], tile:Tile):
         tile.placed_pos = pos
