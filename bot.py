@@ -1,7 +1,9 @@
-# from helper.game import *
+from helper.game import *
 from lib.config.map_config import MAP_CENTER, MAX_MAP_LENGTH, MONASTARY_IDENTIFIER
 from lib.interact.tile import create_base_tiles, create_river_tiles, Tile
 from lib.interact.structure import StructureType
+from lib.interface.events.typing import *
+from lib.interface.events.moves.typing import *
 from itertools import product
 
 
@@ -187,7 +189,7 @@ class Deck:
 # BOARD
 class Board:
     def __init__(self):
-        self.grid = {}
+        self.grid: dict[tuple[int, int]: Tile | None] = {}
         for i in range(MAX_MAP_LENGTH):
             for j in range(MAX_MAP_LENGTH):
                 self.grid[(i, j)] = None
@@ -197,13 +199,13 @@ class Board:
             [MAP_CENTER[0]+1, MAP_CENTER[1]+1]      # towards bottom-right corner (4th quadrant)
         ]  # no need to brute force
     
-    def place_tile(self, x: int, y: int, tile:Tile):
-        tile.placed_pos = (x, y)
-        self.grid[(x, y)] = tile
+    def place_tile(self, pos: tuple[int, int], tile:Tile):
+        tile.placed_pos = pos
+        self.grid[pos] = tile
 
         # update scannable area
         for i in range(2):
-            x_diff = x - self.scannable[i][0]
+            x_diff = pos[0] - self.scannable[i][0]
             if not x_diff:
                 if i == 0:
                     self.scannable[0][0] -= 1
@@ -211,7 +213,7 @@ class Board:
                 else:
                     self.scannable[1][0] += 1
                     return
-            y_diff = y - self.scannable[i][1]
+            y_diff = pos[1] - self.scannable[i][1]
             if not y_diff:
                 if i == 0:
                     self.scannable[0][1] -= 1
@@ -221,38 +223,119 @@ class Board:
                     return
         # DON'T FORGET TO REMOVE CARD FROM DECK
 
+    def can_be_placed(self, pos: tuple[int, int], tile:Tile) -> bool:
+        """
+        Check if a card can be placed on a specific coords.
+        Should be used only for checking tiles in hand
+        """
+        # just in case it's occupied
+        if self.grid[pos]:
+            return False
+
+        # set conditions
+        must_match = {edge:None for edge in Tile.get_edges()}
+        adjacent_tiles = [
+            (pos[0]-1, pos[1]),   # left_edge
+            (pos[0]+1, pos[1]),   # right_edge
+            (pos[0], pos[1]-1),   # top_edge
+            (pos[0], pos[1]+1)    # bottom_edge
+        ]
+
+        if self.grid[adjacent_tiles[0]]:
+            must_match["left_edge"] = self.grid[adjacent_tiles[0]].internal_edges.right_edge
+        else:
+            del must_match["left_edge"]
+        if self.grid[adjacent_tiles[1]]:
+            must_match["right_edge"] = self.grid[adjacent_tiles[1]].internal_edges.left_edge
+        else:
+            del must_match["right_edge"]
+        if self.grid[adjacent_tiles[2]]:
+            must_match["top_edge"] = self.grid[adjacent_tiles[2]].internal_edges.bottom_edge
+        else:
+            del must_match["top_edge"]
+        if self.grid[adjacent_tiles[3]]:
+            must_match["bottom_edge"] = self.grid[adjacent_tiles[3]].internal_edges.top_edge
+        else:
+            del must_match["bottom_edge"]
+
+        # check conditions
+        for _ in range(4):
+            tile.rotate_clockwise(1)
+            tile_edges = tile.internal_edges
+            matched = 0
+            for k, v in must_match.items():
+                if tile_edges[k] != v:
+                    break
+                matched += 1
+            if matched == len(must_match):
+                return True
+        return False
+
 
 # BOT
 class Bot:
-    def __init__(self):
+    def __init__(self, depth: int=5):
         # self.game = Game()
         self.deck = Deck().generate_deck()
         self.board = Board()
-    
-    def place_tile(self, x: int, y: int, tile:Tile):
-        self.board(x, y, tile)
-        self.deck.remove_card(tile)
-
-    # def handle_place_tile(self, query: QueryPlaceTile):
-    #     pass
-
-    # def handle_place_meeple(self, query: QueryPlaceMeeple):
-    #     pass
-    
-    # def choose_move(self, query: QueryType):
-    #     match query:
-    #         case QueryPlaceTile() as q:
-    #                 return self.handle_place_tile(q)
-
-    #         case QueryPlaceMeeple() as q:
-    #             return self.handle_place_meeple(q)
 
     def run(self):
-        # while True:
-        #     query = self.game.get_next_query()
-        #     self.game.send_move(self.choose_move(query))
-        a = self.deck.possible_matches(top_edge=StructureType.GRASS, bottom_edge=StructureType.GRASS, left_edge=StructureType.CITY)
+        # can_be_placed demo
+        self.place_tile(MAP_CENTER, Tile.get_starting_tile())
+        print(self.board.can_be_placed((85,84), Tile.get_river_end_tile()))
+    #     while True:
+    #         query = self.game.get_next_query()
+    #         print("sending move")
+    #         self.game.send_move(self.choose_move(query))
+    
+    def place_tile(self, pos: tuple[int, int], tile:Tile):
+        self.board.place_tile(pos, tile)
+        self.deck.remove_card(tile)
+    
+    @staticmethod
+    def tile_index(tile: Tile, tile_list: list[Tile]):
+        for i in range(tile_list):
+            if tile.tile_type == tile_list[i].tile_type:
+                return i
+    
+    def update_meeple(self, players_meeples):
+        self.board.players_meeples = players_meeples
+
+    def calculate_most_points(self, tiles_in_hand: list[Tile]) -> Tile:
+        # best_tile = Tile()
+        # return best_tile
         pass
+
+    def handle_place_tile(self, query: QueryPlaceTile) -> MovePlaceTile:
+        state = self.game.state
+        last_moves = state.event_history[-state.new_events:]
+        tiles_in_hand = state.my_tiles
+
+        # Update the board
+        for event in last_moves:
+            match event:
+                case PublicMovePlaceTile():
+                    self.place_tile(event.tile)
+                    self.update_meeple(state.players_meeples)
+                case EventPlayerMeepleFreed():
+                    self.update_meeple(state.players_meeples)
+        
+        best_move = self.calculate_most_points()
+        return self.game.move_place_tile(query, best_move._to_model(), Bot.tile_index(best_move))
+
+    def handle_place_meeple(self, query: QueryPlaceMeeple) -> MovePlaceMeeple | MovePlaceMeeplePass:
+        pass
+    
+    def choose_move(self, query: QueryType):
+        match query:
+            case QueryPlaceTile() as q:
+                return self.handle_place_tile(q)
+
+            case QueryPlaceMeeple() as q:
+                return self.handle_place_meeple(q)
+            
+            case _:
+                assert False
 
 
 if __name__ == "__main__":
