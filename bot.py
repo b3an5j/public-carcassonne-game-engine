@@ -43,6 +43,9 @@ class Deck:
         self.cards = Deck._generate_slots(len(self.ori), self.ori, self.stc)
         self.in_hand = None
     
+    def copy(self):
+        return deepcopy(self)
+    
     def _fetch_leaf(self, tile: Tile, check_last=False) -> EdgeLayer | Tile:
         """
         Fetch the last layer of deck that might contain the card.
@@ -149,6 +152,7 @@ class Deck:
         return self
     
     def _possible_combinations(self, param_list: list[StructureType | None]):
+        """Return all combinations of Tile given edges (StructureType)"""
         for i in range(len(param_list)):
             if not param_list[i]:
                 param_list[i] = self.stc
@@ -168,9 +172,16 @@ class Deck:
                 )
             )
         return tile_combs
+
+    @staticmethod
+    def _symmetric(tile: Tile) -> bool:
+        """Check if a tile is symmetric"""
+        if tile.internal_edges["left_edge"] == tile.internal_edges["right_edge"] and tile.internal_edges["top_edge"] == tile.internal_edges["bottom_edge"]:
+            return True
+        return False
     
-    def possible_matches(self, left_edge: StructureType=None, right_edge: StructureType=None, top_edge: StructureType=None, bottom_edge: StructureType=None):
-        """Search for possible matches in current deck of cards"""
+    def _possible_matches(self, left_edge: StructureType=None, right_edge: StructureType=None, top_edge: StructureType=None, bottom_edge: StructureType=None):
+        """Search for possible matches in current deck of cards (rotations included inside the Tile)"""
         # empty params
         if left_edge is right_edge is top_edge is bottom_edge is None:
             print("MUST SPECIFY AT LEAST ONE")
@@ -183,8 +194,19 @@ class Deck:
             for _ in range(4):
                 t.rotate_clockwise(1)
                 matched = self._fetch_leaf(t, check_last=True)
-                if matched and matched not in matched_tiles:
-                    matched_tiles.append(matched)
+                if not matched:
+                    continue
+                if self._symmetric(matched):
+                    skip = False
+                    for tile in matched_tiles:
+                        if matched.tile_type == tile.tile_type:
+                            skip = True
+                            break
+                    if skip:
+                        continue
+                temp = deepcopy(matched)
+                temp.rotate_clockwise(4-t.rotation)
+                matched_tiles.append(temp)
         return matched_tiles
 
 # BOARD
@@ -203,8 +225,17 @@ class Board:
     def copy(self):
         return deepcopy(self)
     
-    def place_tile(self, pos: tuple[int, int], tile:Tile):
+    def place_tile(self, pos: tuple[int, int], tile:Tile) -> bool:
+        """
+        Place a tile on the Board
+        Returns True when successful
+        """
         tile.placed_pos = pos
+
+        # occupied
+        if self.grid[pos]:
+            return False
+
         self.grid[pos] = tile
 
         # update scannable area
@@ -213,19 +244,50 @@ class Board:
             if not x_diff:
                 if i == 0:
                     self.scannable[0][0] -= 1
-                    return
+                    return True
                 else:
                     self.scannable[1][0] += 1
-                    return
+                    return True
             y_diff = pos[1] - self.scannable[i][1]
             if not y_diff:
                 if i == 0:
                     self.scannable[0][1] -= 1
-                    return
+                    return True
                 else:
                     self.scannable[1][1] += 1
-                    return
+                    return True
         # DON'T FORGET TO REMOVE CARD FROM DECK
+        return False
+    
+    def adjacent_coords(self, pos: tuple[int, int]):
+        """Return coords of adjacent tiles"""
+        return {
+            "left_tile": (pos[0]-1, pos[1]),
+            "right_tile": (pos[0]+1, pos[1]),
+            "top_tile": (pos[0], pos[1]-1),
+            "bottom_tile": (pos[0], pos[1]+1)
+        }
+    
+    def surrounding_edges(self, pos: tuple[int, int]):
+        """Return the edges that must be matched"""
+        adjacent_tiles = self.adjacent_coords(pos)
+        return {
+            "left_edge": self.grid[adjacent_tiles["left_tile"]].internal_edges.right_edge if self.grid[adjacent_tiles["left_tile"]] else None,
+            "right_edge": self.grid[adjacent_tiles["right_tile"]].internal_edges.left_edge if self.grid[adjacent_tiles["right_tile"]] else None,
+            "top_edge": self.grid[adjacent_tiles["top_tile"]].internal_edges.bottom_edge if self.grid[adjacent_tiles["top_tile"]] else None,
+            "bottom_edge": self.grid[adjacent_tiles["bottom_tile"]].internal_edges.top_edge if self.grid[adjacent_tiles["bottom_tile"]] else None
+        }
+    
+    def possible_moves(self, pos: tuple[int, int], deck: Deck):
+        """Search for possible moves of a coord in current deck of cards"""
+        surr_edges = self.surrounding_edges(pos)
+        matched_tiles = deck._possible_matches(
+            left_edge=surr_edges["left_edge"],
+            right_edge=surr_edges["right_edge"],
+            top_edge=surr_edges["top_edge"],
+            bottom_edge=surr_edges["bottom_edge"]
+        )
+        return matched_tiles
 
     def can_be_placed(self, pos: tuple[int, int], tile:Tile) -> bool:
         """
@@ -238,27 +300,22 @@ class Board:
 
         # set conditions
         must_match = {edge:None for edge in Tile.get_edges()}
-        adjacent_tiles = [
-            (pos[0]-1, pos[1]),   # left_edge
-            (pos[0]+1, pos[1]),   # right_edge
-            (pos[0], pos[1]-1),   # top_edge
-            (pos[0], pos[1]+1)    # bottom_edge
-        ]
+        surr_edges = self.surrounding_edges(pos)
 
-        if self.grid[adjacent_tiles[0]]:
-            must_match["left_edge"] = self.grid[adjacent_tiles[0]].internal_edges.right_edge
+        if surr_edges["left_edge"]:
+            must_match["left_edge"] = surr_edges["left_edge"]
         else:
             del must_match["left_edge"]
-        if self.grid[adjacent_tiles[1]]:
-            must_match["right_edge"] = self.grid[adjacent_tiles[1]].internal_edges.left_edge
+        if surr_edges["right_edge"]:
+            must_match["right_edge"] = surr_edges["right_edge"]
         else:
             del must_match["right_edge"]
-        if self.grid[adjacent_tiles[2]]:
-            must_match["top_edge"] = self.grid[adjacent_tiles[2]].internal_edges.bottom_edge
+        if surr_edges["top_edge"]:
+            must_match["top_edge"] = surr_edges["top_edge"]
         else:
             del must_match["top_edge"]
-        if self.grid[adjacent_tiles[3]]:
-            must_match["bottom_edge"] = self.grid[adjacent_tiles[3]].internal_edges.top_edge
+        if surr_edges["bottom_edge"]:
+            must_match["bottom_edge"] = surr_edges["bottom_edge"]
         else:
             del must_match["bottom_edge"]
 
@@ -286,18 +343,20 @@ class Bot:
     def run(self):
         # can_be_placed demo
         self.place_tile(MAP_CENTER, Tile.get_starting_tile())
-        print(self.board.can_be_placed((85,84), Tile.get_river_end_tile()))
+        print(self.board.possible_matches((85,84), self.deck))
     #     while True:
     #         query = self.game.get_next_query()
     #         print("sending move")
     #         self.game.send_move(self.choose_move(query))
     
     def place_tile(self, pos: tuple[int, int], tile:Tile):
+        """Place tile on Board, then remove it from Deck"""
         self.board.place_tile(pos, tile)
         self.deck.remove_card(tile)
     
     @staticmethod
     def tile_index(tile: Tile, tile_list: list[Tile]):
+        """Return index of a tile in hand"""
         for i in range(tile_list):
             if tile.tile_type == tile_list[i].tile_type:
                 return i
