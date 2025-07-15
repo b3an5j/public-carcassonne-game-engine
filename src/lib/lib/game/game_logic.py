@@ -15,10 +15,15 @@ class GameLogic(SharedGameState):
     def _get_claims_objs(self, tile: "Tile", edge: str) -> dict[int, list[Meeple]]:
         players = defaultdict(list)
 
-        for connected_tile, _ in self._traverse_connected_component(tile, edge):
-            meeple = connected_tile.internal_claims[edge]
+        for connected_tile, e in self._traverse_connected_component(tile, edge):
+            meeple = connected_tile.internal_claims[e]
             if meeple is not None:
                 players[meeple.player_id].append(meeple)
+
+        starting_tile_meeple = tile.internal_claims[edge]
+
+        if starting_tile_meeple:
+            players[starting_tile_meeple.player_id].append(starting_tile_meeple)
 
         return players
 
@@ -36,6 +41,11 @@ class GameLogic(SharedGameState):
             meeple = connected_tile.internal_claims[e]
             if meeple is not None:
                 players.add(meeple.player_id)
+
+        starting_tile_meeple = tile.internal_claims[edge]
+
+        if starting_tile_meeple:
+            players.add(starting_tile_meeple.player_id)
 
         return list(players)
 
