@@ -10,14 +10,14 @@ from copy import deepcopy
 
 # CARDS
 class EdgeLayer:
-    def __init__(self, orientation: str, stc_list):
+    def __init__(self, orientation: str, stc_list: list[StructureType]):
         self.orientation = orientation
         self.structs = {s: None for s in stc_list}
 
 
 class Deck:
     @staticmethod
-    def _generate_slots(depth: int, ori_list: list[str], stc_list: list[dict], deck=None):
+    def _generate_slots(depth: int, ori_list: list[str], stc_list: list[StructureType], deck=None):
         """Generate slots for cards to form a deck"""
         # base case
         if depth == 1:
@@ -40,11 +40,34 @@ class Deck:
             StructureType.CITY,
             StructureType.GRASS
         ]
-        self.cards = Deck._generate_slots(len(self.ori), self.ori, self.stc)
-        self.in_hand = None
+        self.cards = Deck._generate_slots(4, self.ori, self.stc)
     
     def copy(self):
         return deepcopy(self)
+    
+    def update_my_cards(self, my_tiles: list[Tile]):
+        """Generate a mini deck only containing cards in hand (my_tiles)"""
+        self.my_cards = Deck()
+        self.my_cards.cards = EdgeLayer("", [])
+        for tile in my_tiles:
+            temp = self.my_cards.cards
+            depth = 4
+            for ori in self.ori:
+                depth -= 1
+                temp.orientation = ori
+                stc = tile.internal_edges[ori]
+                
+                if stc not in temp.structs:
+                    if depth:
+                        temp.structs[stc] = EdgeLayer("", [])
+                        temp = temp.structs[stc]
+                    else:
+                        temp.structs[stc] = [tile, 1]
+                else:
+                    if depth:
+                        temp = temp.structs[stc]
+                    else:
+                        temp.structs[stc][1] += 1
     
     def _fetch_leaf(self, tile: Tile, check_last=False) -> EdgeLayer | Tile:
         """
@@ -53,7 +76,7 @@ class Deck:
         """
         temp = self.cards
         try:
-            for _ in range(len(self.ori)-1):
+            for _ in range(4-1):
                 temp= temp.structs[tile.internal_edges[temp.orientation]]
         except KeyError:
             return None
@@ -89,7 +112,7 @@ class Deck:
         
         if not layer.structs[tile.internal_edges[layer.orientation]][1]:
             layer.structs[tile.internal_edges[layer.orientation]] = None
-            self.clean(self.cards, len(self.ori))
+            self.clean(self.cards, 4)
 
     def _load(self):
         """Load every card into the deck"""
@@ -148,7 +171,7 @@ class Deck:
     def generate_deck(self):
         """Generate ready-to-use deck"""
         self._load()
-        self.clean(self.cards, len(self.ori))
+        self.clean(self.cards, 4)
         return self
     
     def _possible_combinations(self, param_list: list[StructureType | None]):
@@ -217,13 +240,33 @@ class Board:
             for j in range(MAX_MAP_LENGTH):
                 self.grid[(i, j)] = None
 
-        self.scannable = [
-            [MAP_CENTER[0]-1, MAP_CENTER[1]-1],     # towards top-left corner (2nd quadrant)
-            [MAP_CENTER[0]+1, MAP_CENTER[1]+1]      # towards bottom-right corner (4th quadrant)
-        ]  # no need to brute force
+        self.placeable = {MAP_CENTER: None}  # no need to brute force
     
     def copy(self):
         return deepcopy(self)
+    
+    def adjacent_coords(self, pos: tuple[int, int]) -> dict[str, tuple[int, int]]:
+        """Return coords of adjacent tiles"""
+        return {
+            "left_edge": (pos[0]-1, pos[1]),    # left tile
+            "right_edge": (pos[0]+1, pos[1]),   # right_tile
+            "top_edge": (pos[0], pos[1]-1),     # top_tile
+            "bottom_edge": (pos[0], pos[1]+1)   # bottom_tile
+        }
+    
+    def surrounding_edges(self, pos: tuple[int, int]=None, adjacent_tiles: dict[str, tuple[int, int]]=None):
+        """Return the edges that must be matched"""
+        if not adjacent_tiles:
+            if not pos:
+                print("MUST SPECIFY POS WHEN NOT GIVING ADJACENT TILES")
+                return None
+            adjacent_tiles = self.adjacent_coords(pos)
+        return {
+            "left_edge": self.grid[adjacent_tiles["left_edge"]].internal_edges.right_edge if self.grid[adjacent_tiles["left_edge"]] else None,
+            "right_edge": self.grid[adjacent_tiles["right_edge"]].internal_edges.left_edge if self.grid[adjacent_tiles["right_edge"]] else None,
+            "top_edge": self.grid[adjacent_tiles["top_edge"]].internal_edges.bottom_edge if self.grid[adjacent_tiles["top_edge"]] else None,
+            "bottom_edge": self.grid[adjacent_tiles["bottom_edge"]].internal_edges.top_edge if self.grid[adjacent_tiles["bottom_edge"]] else None
+        }
     
     def place_tile(self, pos: tuple[int, int], tile:Tile) -> bool:
         """
@@ -237,50 +280,21 @@ class Board:
             return False
 
         self.grid[pos] = tile
+        del self.placeable[pos]
 
-        # update scannable area
-        for i in range(2):
-            x_diff = pos[0] - self.scannable[i][0]
-            if not x_diff:
-                if i == 0:
-                    self.scannable[0][0] -= 1
-                    return True
-                else:
-                    self.scannable[1][0] += 1
-                    return True
-            y_diff = pos[1] - self.scannable[i][1]
-            if not y_diff:
-                if i == 0:
-                    self.scannable[0][1] -= 1
-                    return True
-                else:
-                    self.scannable[1][1] += 1
-                    return True
+        # update placeable coords
+        adj_coords = self.adjacent_coords(pos)
+        adj_edges = self.surrounding_edges(adjacent_tiles=adj_coords)
+        for k in adj_edges:
+            # take empty ones 
+            if not adj_edges[k]:
+                self.placeable[adj_coords[k]] = None
         # DON'T FORGET TO REMOVE CARD FROM DECK
-        return False
-    
-    def adjacent_coords(self, pos: tuple[int, int]):
-        """Return coords of adjacent tiles"""
-        return {
-            "left_tile": (pos[0]-1, pos[1]),
-            "right_tile": (pos[0]+1, pos[1]),
-            "top_tile": (pos[0], pos[1]-1),
-            "bottom_tile": (pos[0], pos[1]+1)
-        }
-    
-    def surrounding_edges(self, pos: tuple[int, int]):
-        """Return the edges that must be matched"""
-        adjacent_tiles = self.adjacent_coords(pos)
-        return {
-            "left_edge": self.grid[adjacent_tiles["left_tile"]].internal_edges.right_edge if self.grid[adjacent_tiles["left_tile"]] else None,
-            "right_edge": self.grid[adjacent_tiles["right_tile"]].internal_edges.left_edge if self.grid[adjacent_tiles["right_tile"]] else None,
-            "top_edge": self.grid[adjacent_tiles["top_tile"]].internal_edges.bottom_edge if self.grid[adjacent_tiles["top_tile"]] else None,
-            "bottom_edge": self.grid[adjacent_tiles["bottom_tile"]].internal_edges.top_edge if self.grid[adjacent_tiles["bottom_tile"]] else None
-        }
+        return True
     
     def possible_moves(self, pos: tuple[int, int], deck: Deck):
-        """Search for possible moves of a coord in current deck of cards"""
-        surr_edges = self.surrounding_edges(pos)
+        """Search for possible moves of a coord in current deck of cards (rotations included inside the Tile)"""
+        surr_edges = self.surrounding_edges(pos=pos)
         matched_tiles = deck._possible_matches(
             left_edge=surr_edges["left_edge"],
             right_edge=surr_edges["right_edge"],
@@ -288,49 +302,10 @@ class Board:
             bottom_edge=surr_edges["bottom_edge"]
         )
         return matched_tiles
+    
+    def update_my_moves(self, my_cards: list[Tile]):
+        """Update possible moves depending on tiles in hand"""
 
-    def can_be_placed(self, pos: tuple[int, int], tile:Tile) -> bool:
-        """
-        Check if a card can be placed on a specific coords.
-        Should be used only for checking tiles in hand
-        """
-        # just in case it's occupied
-        if self.grid[pos]:
-            return False
-
-        # set conditions
-        must_match = {edge:None for edge in Tile.get_edges()}
-        surr_edges = self.surrounding_edges(pos)
-
-        if surr_edges["left_edge"]:
-            must_match["left_edge"] = surr_edges["left_edge"]
-        else:
-            del must_match["left_edge"]
-        if surr_edges["right_edge"]:
-            must_match["right_edge"] = surr_edges["right_edge"]
-        else:
-            del must_match["right_edge"]
-        if surr_edges["top_edge"]:
-            must_match["top_edge"] = surr_edges["top_edge"]
-        else:
-            del must_match["top_edge"]
-        if surr_edges["bottom_edge"]:
-            must_match["bottom_edge"] = surr_edges["bottom_edge"]
-        else:
-            del must_match["bottom_edge"]
-
-        # check conditions
-        for _ in range(4):
-            tile.rotate_clockwise(1)
-            tile_edges = tile.internal_edges
-            matched = 0
-            for k, v in must_match.items():
-                if tile_edges[k] != v:
-                    break
-                matched += 1
-            if matched == len(must_match):
-                return True
-        return False
 
 
 # BOT
@@ -341,9 +316,11 @@ class Bot:
         self.board = Board()
 
     def run(self):
-        # can_be_placed demo
         self.place_tile(MAP_CENTER, Tile.get_starting_tile())
-        print(self.board.possible_matches((85,84), self.deck))
+        self.deck.update_my_cards([Tile.get_starting_tile(), Tile.get_starting_tile(), Tile.get_river_end_tile()])
+        for e in self.all_moves().items():
+            print(e)
+        pass
     #     while True:
     #         query = self.game.get_next_query()
     #         print("sending move")
@@ -360,19 +337,29 @@ class Bot:
         for i in range(tile_list):
             if tile.tile_type == tile_list[i].tile_type:
                 return i
+            
+    def all_moves(self):
+        """Return all moves we can make"""
+        moves: dict[tuple[int, int], list[Tile]] = {}
+        for pos in self.board.placeable:
+            temp = self.board.possible_moves(pos, self.deck.my_cards)
+            if temp:
+                moves[pos] = temp
+        return moves
     
     def update_meeple(self, players_meeples):
         self.board.players_meeples = players_meeples
 
-    def calculate_most_points(self, tiles_in_hand: list[Tile]) -> Tile:
-        # best_tile = Tile()
-        # return best_tile
+    def calculate_most_points(self) -> Tile:
         pass
 
     def handle_place_tile(self, query: QueryPlaceTile) -> MovePlaceTile:
         state = self.game.state
         last_moves = state.event_history[-state.new_events:]
-        tiles_in_hand = state.my_tiles
+        # Also, check the move(s) is our move so we don't do double move(s)
+        
+        # Update the deck
+        self.deck.update_my_cards(self.game.state.my_tiles)
 
         # Update the board
         for event in last_moves:
