@@ -40,7 +40,7 @@ class Deck:
             StructureType.CITY,
             StructureType.GRASS
         ]
-        self.cards = Deck._generate_slots(4, self.ori, self.stc)
+        self.cards = Deck._generate_slots(len(self.ori), self.ori, self.stc)
     
     def copy(self):
         return deepcopy(self)
@@ -51,7 +51,7 @@ class Deck:
         self.my_cards.cards = EdgeLayer("", [])
         for tile in my_tiles:
             temp = self.my_cards.cards
-            depth = 4
+            depth = len(self.ori)
             for ori in self.ori:
                 depth -= 1
                 temp.orientation = ori
@@ -76,7 +76,7 @@ class Deck:
         """
         temp = self.cards
         try:
-            for _ in range(4-1):
+            for _ in range(len(self.ori)-1):
                 temp= temp.structs[tile.internal_edges[temp.orientation]]
         except KeyError:
             return None
@@ -94,7 +94,7 @@ class Deck:
         return temp
     
     def _reset_rotation(self, tile: Tile):
-        tile.rotate_clockwise(4 - tile.rotation)
+        tile.rotate_clockwise(len(self.ori) - tile.rotation)
 
     def insert_card(self, tile: Tile, num_tiles: int):
         """Insert card and number of cards into appropriate slots"""
@@ -112,7 +112,7 @@ class Deck:
         
         if not layer.structs[tile.internal_edges[layer.orientation]][1]:
             layer.structs[tile.internal_edges[layer.orientation]] = None
-            self.clean(self.cards, 4)
+            self.clean(self.cards, len(self.ori))
 
     def _load(self):
         """Load every card into the deck"""
@@ -171,7 +171,7 @@ class Deck:
     def generate_deck(self):
         """Generate ready-to-use deck"""
         self._load()
-        self.clean(self.cards, 4)
+        self.clean(self.cards, len(self.ori))
         return self
     
     def _possible_combinations(self, param_list: list[StructureType | None]):
@@ -214,7 +214,7 @@ class Deck:
         possible_tiles: list[Tile] = self._possible_combinations([left_edge, right_edge, top_edge, bottom_edge])
         for t in possible_tiles:
             # rotate 4 times to check
-            for _ in range(4):
+            for _ in range(len(self.ori)):
                 t.rotate_clockwise(1)
                 matched = self._fetch_leaf(t, check_last=True)
                 if not matched:
@@ -228,7 +228,7 @@ class Deck:
                     if skip:
                         continue
                 temp = deepcopy(matched)
-                temp.rotate_clockwise(4-t.rotation)
+                temp.rotate_clockwise(len(self.ori)-t.rotation)
                 matched_tiles.append(temp)
         return matched_tiles
 
@@ -302,10 +302,6 @@ class Board:
             bottom_edge=surr_edges["bottom_edge"]
         )
         return matched_tiles
-    
-    def update_my_moves(self, my_cards: list[Tile]):
-        """Update possible moves depending on tiles in hand"""
-
 
 
 # BOT
