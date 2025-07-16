@@ -1,3 +1,5 @@
+from re import sub
+from typing import cast
 from lib.interface.events.typing import EventPlayerWon
 from engine.config.game_config import (
     MAX_ROUNDS,
@@ -17,6 +19,7 @@ from engine.interface.logging.event_factory import event_banned_factory
 from engine.interface.logging.event_inspector import EventInspector
 from engine.state.game_state import GameState
 from engine.config.io_config import CORE_DIRECTORY
+from engine.game.tile_subscriber import MonastaryNeighbourSubsciber
 
 from engine.state.player_state import PlayerState
 from engine.state.state_mutator import StateMutator
@@ -24,7 +27,7 @@ from engine.state.state_mutator import StateMutator
 from lib.config.expansion import EXPANSION
 from lib.config.map_config import MAP_CENTER, TILE_EDGE_IDS, TILE_EXTERNAL_POS
 from lib.interact.structure import StructureType
-from lib.interact.tile import Tile
+from lib.interact.tile import MONASTARY_IDENTIFIER, Tile
 from lib.interface.events.event_game_ended import (
     EventGameEndedStaleMate,
 )
@@ -227,13 +230,63 @@ class GameEngine:
             if meeple.placed is not None
         ]
 
-        for tile, edge in tiles_unclaimed:
-            players = self.state._get_claims_objs(tile, edge)
+        # Players may have multiple meepls per connected structure component
+        structures_visited: set[tuple["Tile", str]] = set()
 
+        for tile, edge in tiles_unclaimed:
+            if edge == MONASTARY_IDENTIFIER:
+                assert tile.placed_pos
+
+                meeple = tile.internal_claims[edge]
+                subsribers = [
+                    cast(MonastaryNeighbourSubsciber, s)
+                    for s in self.state.tile_publisher.watchers[tile.placed_pos]
+                    if isinstance(s, MonastaryNeighbourSubsciber)
+                    and cast(MonastaryNeighbourSubsciber, s).center == tile.placed_pos
+                ]
+
+                assert len(subsribers) == 1
+
+                assert meeple is not None
+
+                reward = len(subsribers[0].filled)
+                self.state.players[meeple.player_id].points += reward
+                meeple._free_meeple()
+                self.mutator.commit(
+                    EventPlayerMeepleFreed(
+                        player_id=meeple.player_id,
+                        reward=reward,
+                        tile=tile._to_model(),
+                        placed_on=edge,
+                    )
+                )
+
+                continue
+
+            # Only check reward once
+            if (tile, edge) in structures_visited:
+                continue
+
+            # Redundant safe add
+            structures_visited.add((tile, edge))
+
+            players = self.state._get_claims_objs(tile, edge)
             players_meeples = sorted(players.values(), key=len, reverse=True)
 
             partial_rewarded_meeples = [players_meeples[0][0]]
             returning_meeples = []
+
+            assert (
+                partial_rewarded_meeples[0].placed is not None
+                and partial_rewarded_meeples[0].placed_edge != ""
+            )
+
+            structures_visited.add(
+                (
+                    partial_rewarded_meeples[0].placed,
+                    partial_rewarded_meeples[0].placed_edge,
+                )
+            )
 
             for pm in players_meeples[1:]:
                 if pm and len(pm) == len(players_meeples[0]):
@@ -242,7 +295,11 @@ class GameEngine:
                 elif pm:
                     returning_meeples.append(pm[0])
 
-            reward = self.state._get_reward(tile, edge)
+                for m in pm:
+                    assert m.placed is not None and m.placed_edge != ""
+                    structures_visited.add((m.placed, m.placed_edge))
+
+            reward = self.state._get_reward(tile, edge, partial=True)
 
             for meeple in partial_rewarded_meeples:
                 self.state.players[meeple.player_id].points += reward
